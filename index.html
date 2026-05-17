@@ -1,206 +1,792 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Thought Stream | Reflective Journal</title>
-    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
-    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
-    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://unpkg.com/lucide@latest"></script>
-    <!-- Google Identity Services & GAPI -->
-    <script src="https://accounts.google.com/gsi/client" async defer></script>
-    <script src="https://apis.google.com/js/api.js" async defer></script>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
-    <style>
-        body { font-family: 'Inter', sans-serif; background-color: #050a09; margin: 0; overflow: hidden; }
-        .app-bg { position: fixed; inset: 0; background: url('background.webp') no-repeat center center; background-size: cover; z-index: 0; }
-        .app-overlay { position: fixed; inset: 0; background: radial-gradient(circle at center, rgba(5, 10, 9, 0.3) 0%, rgba(5, 10, 9, 0.8) 100%); z-index: 1; }
-        .glass-card { background: rgba(10, 26, 21, 0.6); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); border: 1px solid rgba(20, 184, 166, 0.15); }
-        input[type='range'] { -webkit-appearance: none; width: 100%; background: transparent; }
-        input[type='range']::-webkit-slider-runnable-track { background: rgba(6, 78, 59, 0.4); border-radius: 10px; height: 6px; }
-        input[type='range']::-webkit-slider-thumb { -webkit-appearance: none; height: 20px; width: 20px; border-radius: 50%; background: #10b981; cursor: pointer; margin-top: -7px; border: 2px solid rgba(255, 255, 255, 0.2); }
-        input, textarea { font-size: 16px !important; }
-        .custom-scrollbar::-webkit-scrollbar { width: 4px; }
-        .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
-        .custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(16, 185, 129, 0.2); border-radius: 10px; }
-    </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Thought Stream</title>
+<link rel="preconnect" href="https://api.fontshare.com">
+<link href="https://api.fontshare.com/v2/css?f[]=general-sans@400,500,600,700&f[]=switzer@300,400,500,600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --font-display: 'General Sans', system-ui, sans-serif;
+    --font-body: 'Switzer', system-ui, sans-serif;
+
+    --paper: rgba(252, 250, 244, 0.82);
+    --paper-edge: rgba(255, 253, 247, 0.5);
+    --ink: #1b241e;
+    --ink-soft: #4a574e;
+    --ink-faint: #8a978d;
+    --moss: #6b8e5f;
+    --moss-deep: #4a6b41;
+    --moss-glow: rgba(107, 142, 95, 0.25);
+    --warm: #b89968;
+    --line: rgba(40, 55, 45, 0.12);
+    --line-strong: rgba(40, 55, 45, 0.22);
+    --shadow-card: 0 20px 60px -10px rgba(15, 30, 20, 0.35), 0 8px 24px -8px rgba(15, 30, 20, 0.25);
+  }
+
+  * { box-sizing: border-box; }
+
+  html, body {
+    margin: 0;
+    padding: 0;
+    min-height: 100vh;
+    font-family: var(--font-body);
+    color: var(--ink);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  body {
+    background-image: url('background.webp');
+    background-size: cover;
+    background-position: center;
+    background-attachment: fixed;
+    background-color: #2a3a2e; /* fallback while image loads */
+    min-height: 100vh;
+    min-height: 100dvh;
+    padding: 24px 16px 48px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-start;
+    position: relative;
+  }
+
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background: radial-gradient(ellipse at center, transparent 0%, rgba(10, 20, 12, 0.35) 100%);
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .card {
+    position: relative;
+    z-index: 1;
+    width: 100%;
+    max-width: 460px;
+    background: var(--paper);
+    backdrop-filter: blur(24px) saturate(140%);
+    -webkit-backdrop-filter: blur(24px) saturate(140%);
+    border: 1px solid var(--paper-edge);
+    border-radius: 28px;
+    padding: 32px 28px 28px;
+    box-shadow: var(--shadow-card);
+    animation: rise 0.9s cubic-bezier(0.16, 1, 0.3, 1) both;
+  }
+
+  @keyframes rise {
+    from { opacity: 0; transform: translateY(20px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  .head {
+    text-align: center;
+    margin-bottom: 28px;
+    padding-bottom: 20px;
+    border-bottom: 1px solid var(--line);
+  }
+
+  .date {
+    font-family: var(--font-body);
+    font-size: 12px;
+    font-weight: 500;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--moss-deep);
+    margin: 0 0 10px;
+    opacity: 0.85;
+  }
+
+  h1 {
+    font-family: var(--font-display);
+    font-weight: 500;
+    font-size: 42px;
+    letter-spacing: -0.015em;
+    margin: 0;
+    color: var(--ink);
+    line-height: 1.0;
+  }
+
+  .subtle {
+    font-family: var(--font-body);
+    font-size: 13px;
+    font-weight: 400;
+    color: var(--ink-soft);
+    margin: 10px 0 0;
+    letter-spacing: 0.01em;
+  }
+
+  section {
+    margin-bottom: 24px;
+    animation: fadeIn 0.7s ease both;
+  }
+  section:nth-of-type(1) { animation-delay: 0.1s; }
+  section:nth-of-type(2) { animation-delay: 0.18s; }
+  section:nth-of-type(3) { animation-delay: 0.26s; }
+  section:nth-of-type(4) { animation-delay: 0.34s; }
+  section:nth-of-type(5) { animation-delay: 0.42s; }
+  section:nth-of-type(6) { animation-delay: 0.50s; }
+
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(8px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  .label {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    margin-bottom: 12px;
+  }
+
+  .label-text {
+    font-family: var(--font-display);
+    font-size: 18px;
+    font-weight: 500;
+    color: var(--ink);
+    letter-spacing: -0.005em;
+  }
+
+  .label-hint {
+    font-family: var(--font-body);
+    font-size: 11px;
+    color: var(--ink-faint);
+    letter-spacing: 0.04em;
+    font-weight: 500;
+  }
+
+  .dots {
+    display: flex;
+    gap: 10px;
+    justify-content: space-between;
+  }
+
+  .dot {
+    flex: 1;
+    aspect-ratio: 1;
+    max-width: 56px;
+    border: 1.5px solid var(--line-strong);
+    background: rgba(255, 253, 247, 0.4);
+    border-radius: 50%;
+    font-family: var(--font-body);
+    font-size: 16px;
+    font-weight: 500;
+    color: var(--ink-soft);
+    cursor: pointer;
+    transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+  }
+
+  .dot:hover {
+    border-color: var(--moss);
+    transform: translateY(-2px);
+  }
+
+  .dot.active {
+    background: linear-gradient(135deg, var(--moss) 0%, var(--moss-deep) 100%);
+    border-color: var(--moss-deep);
+    color: #fbfaf5;
+    box-shadow: 0 4px 16px var(--moss-glow);
+    transform: scale(1.06);
+  }
+
+  .scale-meta {
+    display: flex;
+    justify-content: space-between;
+    margin-top: 8px;
+    font-size: 10.5px;
+    color: var(--ink-faint);
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    font-family: var(--font-body);
+  }
+
+  .notes-field {
+    width: 100%;
+    min-height: 96px;
+    padding: 14px 16px;
+    border: 1px solid var(--line-strong);
+    border-radius: 14px;
+    background: rgba(255, 253, 247, 0.55);
+    font-family: var(--font-body);
+    font-size: 15px;
+    color: var(--ink);
+    line-height: 1.55;
+    resize: vertical;
+    transition: border-color 0.2s, background 0.2s;
+  }
+
+  .notes-field:focus {
+    outline: none;
+    border-color: var(--moss);
+    background: rgba(255, 253, 247, 0.85);
+  }
+
+  .notes-field::placeholder {
+    color: var(--ink-faint);
+    font-family: var(--font-body);
+  }
+
+  .selected-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-bottom: 10px;
+  }
+  .selected-tags:empty { display: none; }
+
+  .tag-pool {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+
+  .tag {
+    padding: 7px 13px;
+    border-radius: 100px;
+    font-size: 13px;
+    font-weight: 500;
+    border: 1px solid var(--line-strong);
+    background: rgba(255, 253, 247, 0.5);
+    color: var(--ink-soft);
+    cursor: pointer;
+    transition: all 0.2s ease;
+    font-family: var(--font-body);
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .tag:hover { border-color: var(--moss); color: var(--ink); }
+
+  .tag.selected {
+    background: linear-gradient(135deg, var(--moss) 0%, var(--moss-deep) 100%);
+    color: #fbfaf5;
+    border-color: var(--moss-deep);
+    box-shadow: 0 2px 8px var(--moss-glow);
+  }
+
+  .tag.selected .x { opacity: 0.7; font-size: 12px; line-height: 1; }
+
+  .tag.new-tag {
+    border-style: dashed;
+    color: var(--moss-deep);
+    background: transparent;
+  }
+  .tag.new-tag:hover { background: rgba(107, 142, 95, 0.08); }
+
+  .photo-btn {
+    width: 100%;
+    padding: 14px;
+    border: 1px dashed var(--line-strong);
+    border-radius: 14px;
+    background: rgba(255, 253, 247, 0.35);
+    color: var(--ink-soft);
+    font-family: var(--font-body);
+    font-size: 13.5px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+  }
+
+  .photo-btn:hover {
+    border-color: var(--moss);
+    color: var(--moss-deep);
+    background: rgba(107, 142, 95, 0.05);
+  }
+
+  .photo-btn svg {
+    width: 18px;
+    height: 18px;
+    stroke: currentColor;
+    fill: none;
+    stroke-width: 1.5;
+  }
+
+  .photo-thumbs {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 10px;
+  }
+
+  .photo-thumb {
+    position: relative;
+    width: 60px;
+    height: 60px;
+    border-radius: 10px;
+    overflow: hidden;
+    border: 1px solid var(--line-strong);
+  }
+
+  .photo-thumb img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+
+  .photo-thumb .remove {
+    position: absolute;
+    top: 2px;
+    right: 2px;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: rgba(20, 30, 22, 0.85);
+    color: white;
+    border: none;
+    cursor: pointer;
+    font-size: 12px;
+    line-height: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+  }
+
+  .submit {
+    width: 100%;
+    padding: 16px;
+    margin-top: 8px;
+    background: linear-gradient(135deg, #2a3d2e 0%, #1d2e22 100%);
+    color: #f5f1e6;
+    border: none;
+    border-radius: 16px;
+    font-family: var(--font-display);
+    font-size: 16px;
+    font-weight: 500;
+    letter-spacing: 0.005em;
+    cursor: pointer;
+    transition: all 0.25s;
+    box-shadow: 0 4px 14px rgba(15, 30, 20, 0.3);
+    animation: fadeIn 0.7s ease both;
+    animation-delay: 0.58s;
+    position: relative;
+  }
+
+  .submit:hover:not(:disabled) {
+    transform: translateY(-1px);
+    box-shadow: 0 8px 20px rgba(15, 30, 20, 0.35);
+  }
+
+  .submit:active:not(:disabled) { transform: translateY(0); }
+
+  .submit:disabled {
+    opacity: 0.7;
+    cursor: not-allowed;
+  }
+
+  .submit .spinner {
+    display: none;
+    width: 16px;
+    height: 16px;
+    border: 2px solid rgba(245, 241, 230, 0.3);
+    border-top-color: #f5f1e6;
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+    vertical-align: middle;
+    margin-right: 8px;
+  }
+
+  .submit.loading .spinner { display: inline-block; }
+  .submit.loading .label-txt { opacity: 0.7; }
+
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .conditional-badge {
+    display: inline-block;
+    font-size: 9.5px;
+    padding: 2px 7px;
+    background: rgba(184, 153, 104, 0.18);
+    color: var(--warm);
+    border-radius: 100px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    font-weight: 600;
+    margin-left: 8px;
+    vertical-align: middle;
+    font-family: var(--font-body);
+  }
+
+  .toast {
+    position: fixed;
+    bottom: 24px;
+    left: 50%;
+    transform: translateX(-50%) translateY(40px);
+    background: rgba(20, 30, 22, 0.95);
+    color: #f5f1e6;
+    padding: 14px 22px;
+    border-radius: 100px;
+    font-family: var(--font-body);
+    font-size: 14px;
+    font-weight: 500;
+    box-shadow: 0 8px 24px rgba(15, 30, 20, 0.4);
+    opacity: 0;
+    transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+    z-index: 100;
+    pointer-events: none;
+  }
+
+  .toast.show {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+
+  .toast.error { background: rgba(120, 40, 40, 0.95); }
+
+  @media (max-width: 380px) {
+    .card { padding: 26px 22px 24px; }
+    h1 { font-size: 36px; }
+  }
+</style>
 </head>
 <body>
-    <div id="root"></div>
-    <script type="text/babel">
-        const { useState, useEffect, useRef } = React;
 
-        /* --- PASTE YOUR CLIENT ID BELOW --- */
-        const CLIENT_ID = '421604577085-9kg06thsl8kk99kvic1j9fjv0iqh5s99.apps.googleusercontent.com'; 
-        const SCOPES = 'https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/spreadsheets';
+  <div class="card" role="form" aria-label="Journal entry">
 
-        const Icon = ({ name, className = "w-5 h-5" }) => {
-            const iconRef = useRef(null);
-            useEffect(() => {
-                if (iconRef.current && window.lucide) {
-                    const icon = lucide.icons[name] || lucide.icons['help-circle'];
-                    if (icon) {
-                        const svg = icon.toSvg({ class: className });
-                        iconRef.current.innerHTML = svg;
-                    }
-                }
-            }, [name, className]);
-            return <span ref={iconRef} className="inline-flex items-center justify-center"></span>;
+    <header class="head">
+      <p class="date" id="dateLabel">Today</p>
+      <h1>Thought Stream</h1>
+      <p class="subtle">a quiet place to set the day down</p>
+    </header>
+
+    <section>
+      <div class="label">
+        <span class="label-text">Mood</span>
+        <span class="label-hint">how it feels</span>
+      </div>
+      <div class="dots" data-metric="mood">
+        <button type="button" class="dot" data-value="1">1</button>
+        <button type="button" class="dot" data-value="2">2</button>
+        <button type="button" class="dot" data-value="3">3</button>
+        <button type="button" class="dot" data-value="4">4</button>
+        <button type="button" class="dot" data-value="5">5</button>
+      </div>
+      <div class="scale-meta"><span>low</span><span>glowing</span></div>
+    </section>
+
+    <section>
+      <div class="label">
+        <span class="label-text">Energy</span>
+        <span class="label-hint">how much in the tank</span>
+      </div>
+      <div class="dots" data-metric="energy">
+        <button type="button" class="dot" data-value="1">1</button>
+        <button type="button" class="dot" data-value="2">2</button>
+        <button type="button" class="dot" data-value="3">3</button>
+        <button type="button" class="dot" data-value="4">4</button>
+        <button type="button" class="dot" data-value="5">5</button>
+      </div>
+      <div class="scale-meta"><span>flat</span><span>charged</span></div>
+    </section>
+
+    <section id="eodSection" style="display: none;">
+      <div class="label">
+        <span class="label-text">How was today<span class="conditional-badge">after 6pm</span></span>
+      </div>
+      <div class="dots" data-metric="eod">
+        <button type="button" class="dot" data-value="1">1</button>
+        <button type="button" class="dot" data-value="2">2</button>
+        <button type="button" class="dot" data-value="3">3</button>
+        <button type="button" class="dot" data-value="4">4</button>
+        <button type="button" class="dot" data-value="5">5</button>
+      </div>
+      <div class="scale-meta"><span>rough</span><span>memorable</span></div>
+    </section>
+
+    <section>
+      <div class="label">
+        <span class="label-text">Notes</span>
+      </div>
+      <textarea class="notes-field" id="notesField" placeholder="What's in the stream today?"></textarea>
+    </section>
+
+    <section>
+      <div class="label">
+        <span class="label-text">Tags</span>
+        <span class="label-hint">tap to add</span>
+      </div>
+      <div class="tag-pool" id="tagPool">
+        <button type="button" class="tag new-tag" id="newTagBtn">+ new tag</button>
+      </div>
+    </section>
+
+    <section>
+      <input type="file" id="photoInput" accept="image/*" multiple style="display: none;">
+      <button type="button" class="photo-btn" id="photoBtn">
+        <svg viewBox="0 0 24 24"><path d="M3 7h3l2-3h8l2 3h3v13H3z"/><circle cx="12" cy="13" r="4"/></svg>
+        Add a photo
+      </button>
+      <div class="photo-thumbs" id="photoThumbs"></div>
+    </section>
+
+    <button type="button" class="submit" id="submitBtn">
+      <span class="spinner"></span><span class="label-txt">Set it down</span>
+    </button>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+<script>
+  // =========================================================================
+  // CONFIG — paste your deployed Apps Script web app URL between the quotes.
+  // The URL looks like: https://script.google.com/macros/s/AKfyc.../exec
+  // SECRET is optional. If you set it, it must match SECRET in Code.gs.
+  // =========================================================================
+  const CONFIG = {
+    WEB_APP_URL: 'https://script.google.com/macros/s/AKfycbzgpfO1RxS_jWW4j4oWG7QTx1fRR8lENcHhwz8QpjyLt4YF4Q7PcdzMGMc01k5ZhGCo/exec',
+    SECRET: ''
+  };
+
+  // ---- State ----
+  let photos = [];
+  let selectedTags = new Set();
+
+  // ---- Date label ----
+  const opts = { weekday: 'long', day: 'numeric', month: 'long' };
+  document.getElementById('dateLabel').textContent =
+    new Date().toLocaleDateString('en-AU', opts);
+
+  // ---- End-of-day visibility ----
+  const hour = new Date().getHours();
+  if (hour >= 18) {
+    document.getElementById('eodSection').style.display = '';
+  }
+
+  // ---- Rating dots ----
+  document.querySelectorAll('.dots').forEach(group => {
+    group.addEventListener('click', e => {
+      const dot = e.target.closest('.dot');
+      if (!dot) return;
+      const wasActive = dot.classList.contains('active');
+      group.querySelectorAll('.dot').forEach(d => d.classList.remove('active'));
+      if (!wasActive) dot.classList.add('active');
+    });
+  });
+
+  function getRating(metric) {
+    const active = document.querySelector(`.dots[data-metric="${metric}"] .dot.active`);
+    return active ? parseInt(active.dataset.value, 10) : null;
+  }
+
+  // ---- Tags ----
+  function renderTag(label, selected = false) {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'tag' + (selected ? ' selected' : '');
+    btn.dataset.tag = label;
+    btn.innerHTML = selected
+      ? `${label} <span class="x">×</span>`
+      : label;
+    return btn;
+  }
+
+  function loadTags(tagList) {
+    const pool = document.getElementById('tagPool');
+    const newBtn = document.getElementById('newTagBtn');
+    pool.querySelectorAll('.tag:not(.new-tag)').forEach(t => t.remove());
+    tagList.forEach(t => {
+      pool.insertBefore(renderTag(t), newBtn);
+    });
+  }
+
+  document.getElementById('tagPool').addEventListener('click', e => {
+    const tag = e.target.closest('.tag');
+    if (!tag || tag.id === 'newTagBtn') return;
+    const label = tag.dataset.tag;
+    if (tag.classList.contains('selected')) {
+      tag.classList.remove('selected');
+      tag.innerHTML = label;
+      selectedTags.delete(label);
+    } else {
+      tag.classList.add('selected');
+      tag.innerHTML = `${label} <span class="x">×</span>`;
+      selectedTags.add(label);
+    }
+  });
+
+  document.getElementById('newTagBtn').addEventListener('click', () => {
+    const name = prompt('New tag name');
+    if (!name) return;
+    const clean = name.trim().toLowerCase();
+    if (!clean) return;
+    if (selectedTags.has(clean)) return;
+    const existing = document.querySelector(`.tag[data-tag="${clean}"]:not(.new-tag)`);
+    if (existing) { existing.click(); return; }
+    const pool = document.getElementById('tagPool');
+    const newBtn = document.getElementById('newTagBtn');
+    const tag = renderTag(clean, true);
+    pool.insertBefore(tag, newBtn);
+    selectedTags.add(clean);
+  });
+
+  // ---- Photos ----
+  document.getElementById('photoBtn').addEventListener('click', () => {
+    document.getElementById('photoInput').click();
+  });
+
+  document.getElementById('photoInput').addEventListener('change', async e => {
+    const files = Array.from(e.target.files);
+    for (const file of files) {
+      try {
+        const compressed = await compressImage(file);
+        photos.push(compressed);
+        addThumb(compressed);
+      } catch (err) {
+        console.error('Photo error:', err);
+      }
+    }
+    e.target.value = '';
+  });
+
+  function compressImage(file) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onerror = reject;
+      reader.onload = ev => {
+        const img = new Image();
+        img.onerror = reject;
+        img.onload = () => {
+          const maxW = 1920;
+          const scale = Math.min(1, maxW / img.width);
+          const w = Math.round(img.width * scale);
+          const h = Math.round(img.height * scale);
+          const canvas = document.createElement('canvas');
+          canvas.width = w;
+          canvas.height = h;
+          const ctx = canvas.getContext('2d');
+          ctx.drawImage(img, 0, 0, w, h);
+          canvas.toBlob(blob => {
+            if (!blob) return reject(new Error('Compression failed'));
+            const r2 = new FileReader();
+            r2.onload = () => {
+              const dataUrl = r2.result;
+              const base64 = dataUrl.split(',')[1];
+              resolve({
+                name: file.name.replace(/\.[^.]+$/, '') + '.jpg',
+                type: 'image/jpeg',
+                base64: base64,
+                previewUrl: dataUrl
+              });
+            };
+            r2.onerror = reject;
+            r2.readAsDataURL(blob);
+          }, 'image/jpeg', 0.85);
         };
+        img.src = ev.target.result;
+      };
+      reader.readAsDataURL(file);
+    });
+  }
 
-        function App() {
-            const [view, setView] = useState('landing');
-            const [sheetId, setSheetId] = useState(null);
-            const [logs, setLogs] = useState([]);
-            const [input, setInput] = useState('');
-            const [isHoliday, setIsHoliday] = useState(false);
-            const [vitals, setVitals] = useState({ moodEnergy: 7, sleep: 7, stress: 3 });
-            const [isApiReady, setIsApiReady] = useState(false);
-            const scrollRef = useRef(null);
-            const tokenClient = useRef(null);
+  function addThumb(photo) {
+    const thumbs = document.getElementById('photoThumbs');
+    const wrap = document.createElement('div');
+    wrap.className = 'photo-thumb';
+    const img = document.createElement('img');
+    img.src = photo.previewUrl;
+    const rm = document.createElement('button');
+    rm.type = 'button';
+    rm.className = 'remove';
+    rm.textContent = '×';
+    rm.addEventListener('click', () => {
+      photos = photos.filter(p => p !== photo);
+      wrap.remove();
+    });
+    wrap.appendChild(img);
+    wrap.appendChild(rm);
+    thumbs.appendChild(wrap);
+  }
 
-            useEffect(() => {
-                let checkCount = 0;
-                const checkInterval = setInterval(() => {
-                    checkCount++;
-                    if (window.gapi && window.google) {
-                        clearInterval(checkInterval);
-                        initApis();
-                    } else if (checkCount > 50) {
-                        clearInterval(checkInterval);
-                        console.error("Google Libraries failed to load.");
-                    }
-                }, 100);
-                return () => clearInterval(checkInterval);
-            }, []);
+  // ---- API call ----
+  async function callScript(action, data = {}) {
+    if (!CONFIG.WEB_APP_URL || CONFIG.WEB_APP_URL.includes('PASTE_YOUR')) {
+      throw new Error('Web app URL not set in CONFIG');
+    }
+    const body = JSON.stringify({ action, secret: CONFIG.SECRET, ...data });
+    // No Content-Type header — defaults to text/plain, avoiding CORS preflight.
+    const response = await fetch(CONFIG.WEB_APP_URL, {
+      method: 'POST',
+      body: body,
+      redirect: 'follow'
+    });
+    if (!response.ok) throw new Error('HTTP ' + response.status);
+    return response.json();
+  }
 
-            const initApis = () => {
-                gapi.load('client', async () => {
-                    try {
-                        await gapi.client.init({
-                            discoveryDocs: ["https://www.googleapis.com/discovery/v1/apis/drive/v3/rest", "https://www.googleapis.com/discovery/v1/apis/sheets/v4/rest"],
-                        });
-                        setIsApiReady(true);
-                    } catch (err) { console.error("GAPI Init Error:", err); }
-                });
+  // ---- Submit ----
+  document.getElementById('submitBtn').addEventListener('click', async () => {
+    const btn = document.getElementById('submitBtn');
+    const payload = {
+      mood: getRating('mood'),
+      energy: getRating('energy'),
+      eod: getRating('eod'),
+      notes: document.getElementById('notesField').value.trim(),
+      tags: Array.from(selectedTags),
+      photos: photos.map(p => ({ name: p.name, type: p.type, base64: p.base64 }))
+    };
 
-                tokenClient.current = google.accounts.oauth2.initTokenClient({
-                    client_id: CLIENT_ID,
-                    scope: SCOPES,
-                    callback: (resp) => { if (!resp.error) handlePostAuth(); },
-                });
-            };
+    btn.classList.add('loading');
+    btn.disabled = true;
 
-            const handleLogin = () => {
-                if (!tokenClient.current) {
-                    alert("Google connection not ready. Please refresh.");
-                    return;
-                }
-                tokenClient.current.requestAccessToken({ prompt: 'consent' });
-            };
+    try {
+      const result = await callScript('submit', { payload });
+      if (result && result.success) {
+        showToast('Set down', 'success');
+        resetForm();
+      } else {
+        showToast((result && result.error) || 'Something went wrong', 'error');
+      }
+    } catch (err) {
+      showToast(err.message || 'Submission failed', 'error');
+    } finally {
+      btn.classList.remove('loading');
+      btn.disabled = false;
+    }
+  });
 
-            const handlePostAuth = async () => {
-                setView('syncing');
-                try {
-                    let folderId = await findOrCreateFolder("Thought Stream");
-                    let fileId = await findOrCreateSheet(folderId, "Thought Stream Journal");
-                    setSheetId(fileId);
-                    const data = await loadSheetData(fileId);
-                    setLogs(data);
-                    setView('journal');
-                } catch (err) { setView('landing'); }
-            };
+  function resetForm() {
+    document.querySelectorAll('.dot.active').forEach(d => d.classList.remove('active'));
+    document.getElementById('notesField').value = '';
+    document.getElementById('photoThumbs').innerHTML = '';
+    photos = [];
+    document.querySelectorAll('.tag.selected:not(.new-tag)').forEach(t => {
+      t.classList.remove('selected');
+      t.innerHTML = t.dataset.tag;
+    });
+    selectedTags.clear();
+  }
 
-            const findOrCreateFolder = async (name) => {
-                const list = await gapi.client.drive.files.list({ q: `name = '${name}' and mimeType = 'application/vnd.google-apps.folder' and trashed = false` });
-                if (list.result.files.length > 0) return list.result.files[0].id;
-                const folder = await gapi.client.drive.files.create({ resource: { name, mimeType: 'application/vnd.google-apps.folder' } });
-                return folder.result.id;
-            };
+  function showToast(msg, kind) {
+    const toast = document.getElementById('toast');
+    toast.textContent = msg;
+    toast.className = 'toast show' + (kind === 'error' ? ' error' : '');
+    setTimeout(() => {
+      toast.className = 'toast' + (kind === 'error' ? ' error' : '');
+    }, 2400);
+  }
 
-            const findOrCreateSheet = async (folderId, name) => {
-                const list = await gapi.client.drive.files.list({ q: `'${folderId}' in parents and name = '${name}' and trashed = false` });
-                if (list.result.files.length > 0) return list.result.files[0].id;
-                const sheet = await gapi.client.drive.files.create({ resource: { name, mimeType: 'application/vnd.google-apps.spreadsheet', parents: [folderId] } });
-                await gapi.client.sheets.spreadsheets.values.update({
-                    spreadsheetId: sheet.result.id, range: 'Sheet1!A1:G1', valueInputOption: 'RAW',
-                    resource: { values: [["Timestamp", "Entry", "Mood/Energy", "Sleep", "Stress", "Away", "Tags"]] }
-                });
-                return sheet.result.id;
-            };
-
-            const loadSheetData = async (id) => {
-                const resp = await gapi.client.sheets.spreadsheets.values.get({ spreadsheetId: id, range: 'Sheet1!A2:G' });
-                return (resp.result.values || []).map((row, i) => ({
-                    id: i, timestamp: row[0], text: row[1],
-                    vitals: { moodEnergy: row[2], sleep: row[3], stress: row[4] },
-                    isHoliday: row[5] === 'Yes', tags: row[6]?.split(';') || []
-                }));
-            };
-
-            const handleSend = async () => {
-                if (!input.trim() && !isHoliday) return;
-                const entry = {
-                    timestamp: new Date().toLocaleString('en-AU'),
-                    text: input,
-                    vitals, isHoliday,
-                    tags: ['general']
-                };
-                setLogs(prev => [...prev, entry]);
-                setInput('');
-                try {
-                    await gapi.client.sheets.spreadsheets.values.append({
-                        spreadsheetId: sheetId, range: 'Sheet1!A2', valueInputOption: 'RAW',
-                        resource: { values: [[entry.timestamp, entry.text, vitals.moodEnergy, vitals.sleep, vitals.stress, isHoliday ? 'Yes' : 'No', 'general']] }
-                    });
-                } catch (e) { console.error("Sync failed:", e); }
-            };
-
-            if (view === 'landing') return (
-                <div className="relative flex flex-col items-center justify-center h-screen text-center px-6">
-                    <div className="app-bg"></div><div className="app-overlay"></div>
-                    <div className="relative z-10 space-y-6">
-                        <div className="bg-emerald-500/20 p-6 rounded-full inline-block border border-emerald-400/20"><Icon name="waves" className="w-12 h-12 text-emerald-300" /></div>
-                        <h1 className="text-4xl font-light text-emerald-50 tracking-tight">Thought Stream</h1>
-                        <button onClick={handleLogin} className="bg-emerald-600 text-emerald-950 font-bold py-4 px-10 rounded-full flex items-center gap-3 mx-auto shadow-xl hover:scale-105 transition-all">
-                            <Icon name="cloud" /> Connect Google Drive
-                        </button>
-                    </div>
-                </div>
-            );
-
-            if (view === 'syncing') return <div className="h-screen bg-[#050a09] flex items-center justify-center text-emerald-500 uppercase tracking-widest text-xs animate-pulse">Flowing...</div>;
-
-            return (
-                <div className="relative flex flex-col h-screen overflow-hidden">
-                    <div className="app-bg"></div><div className="app-overlay"></div>
-                    <div className="relative z-10 flex flex-col h-full">
-                        <header className="p-4 md:p-6 glass-card border-b border-white/5 flex justify-between items-center">
-                            <div className="flex items-center gap-3"><Icon name="waves" className="text-emerald-300" /><h1 className="text-emerald-50">Thought Stream</h1></div>
-                            <div className="text-[10px] text-emerald-500 font-bold uppercase tracking-widest flex items-center gap-2"><div className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse"></div>Syncing</div>
-                        </header>
-                        <section className="p-4 md:p-6 bg-black/20 backdrop-blur-sm border-b border-white/5">
-                            <div className="max-w-3xl mx-auto grid grid-cols-1 md:grid-cols-3 gap-6">
-                                {[{l:'Mood/Energy', k:'moodEnergy', i:'sunset'}, {l:'Sleep', k:'sleep', i:'cloud-moon'}, {l:'Stress', k:'stress', i:'leaf'}].map(item => (
-                                    <div key={item.k} className="space-y-2">
-                                        <div className="flex justify-between text-[11px] text-emerald-100/60 font-medium">
-                                            <span className="flex items-center gap-2"><Icon name={item.i} className="w-3.5 h-3.5 opacity-70" /> {item.l}</span>
-                                            <span className="text-emerald-400 font-mono">{vitals[item.k]}</span>
-                                        </div>
-                                        <input type="range" min="1" max="10" value={vitals[item.k]} onChange={e => setVitals({...vitals, [item.k]: parseInt(e.target.value)})}/>
-                                    </div>
-                                ))}
-                            </div>
-                        </section>
-                        <main ref={scrollRef} className="flex-1 overflow-y-auto p-4 md:p-6 custom-scrollbar">
-                            <div className="max-w-2xl mx-auto space-y-6 pb-12">
-                                {logs.slice().reverse().map((log, idx) => (
-                                    <div key={idx} className="glass-card rounded-[2rem] p-6 shadow-2xl transition-all hover:border-emerald-500/20">
-                                        <div className="flex justify-between items-center mb-4">
-                                            <div className="text-[10px] text-emerald-500 font-bold uppercase tracking-widest">{log.timestamp}</div>
-                                            {log.isHoliday && <span className="text-[9px] bg-amber-500/10 text-amber-500 px-2 py-0.5 rounded-full border border-amber-500/20 uppercase tracking-widest">Away</span>}
-                                        </div>
-                                        <p className="text-emerald-50/90 text-sm italic font-light leading-relaxed">"{log.text || 'Stillness.'}"</p>
-                                        <div className="mt-4 pt-4 border-t border-white/5 flex gap-3 text-[10px] text-emerald-500/40 font-mono">
+  // ---- Initial tag load ----
+  (async () => {
+    try {
+      const result = await callScript('getTags');
+      if (result && result.success && Array.isArray(result.tags)) {
+        loadTags(result.tags);
+      }
+    } catch (err) {
+      console.error('Tag load failed:', err);
+    }
+  })();
+</script>
+</body>
+</html>
