@@ -458,6 +458,115 @@
     .card { padding: 26px 22px 24px; }
     h1 { font-size: 36px; }
   }
+
+  /* ==== Trends card (added July 2026) ==== */
+  .trends-card {
+    margin-top: 16px;
+    padding: 0;
+    overflow: hidden;
+    animation-delay: 0.2s;
+  }
+
+  .trends-toggle {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 20px 24px;
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    font-family: var(--font-display);
+    color: var(--ink);
+    text-align: left;
+  }
+
+  .trends-title {
+    font-size: 18px;
+    font-weight: 500;
+    letter-spacing: -0.005em;
+  }
+
+  .trends-hint {
+    font-family: var(--font-body);
+    font-size: 11px;
+    color: var(--ink-faint);
+    letter-spacing: 0.04em;
+    font-weight: 500;
+    margin-left: auto;
+  }
+
+  .trends-toggle .chev {
+    width: 16px;
+    height: 16px;
+    stroke: var(--ink-soft);
+    fill: none;
+    stroke-width: 2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    transition: transform 0.25s ease;
+    flex-shrink: 0;
+  }
+
+  .trends-toggle[aria-expanded="true"] .chev { transform: rotate(180deg); }
+
+  .trends-body { padding: 0 20px 22px; }
+
+  .trends-msg {
+    font-family: var(--font-body);
+    font-size: 13px;
+    color: var(--ink-soft);
+    line-height: 1.55;
+    margin: 4px 2px 8px;
+  }
+
+  .trends-stats {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px 14px;
+    align-items: center;
+    font-family: var(--font-body);
+    font-size: 12px;
+    color: var(--ink-soft);
+    margin: 2px 2px 10px;
+  }
+
+  .trends-stats strong { color: var(--ink); font-weight: 600; }
+
+  .trends-dot {
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    margin-right: 5px;
+  }
+
+  .trends-caption {
+    font-family: var(--font-body);
+    font-size: 11px;
+    color: var(--ink-faint);
+    line-height: 1.55;
+    margin: 10px 2px 0;
+  }
+
+  #trendsChart { position: relative; }
+
+  .trends-tip {
+    position: absolute;
+    pointer-events: none;
+    display: none;
+    z-index: 5;
+    background: rgba(20, 30, 22, 0.95);
+    color: #f5f1e6;
+    font-family: var(--font-body);
+    font-size: 11px;
+    line-height: 1.5;
+    padding: 6px 9px;
+    border-radius: 8px;
+    white-space: nowrap;
+    transform: translate(-50%, -100%);
+    box-shadow: 0 8px 24px rgba(15, 30, 20, 0.4);
+  }
 </style>
 </head>
 <body>
@@ -543,6 +652,23 @@
     <button type="button" class="submit" id="submitBtn">
       <span class="spinner"></span><span class="label-txt">Set it down</span>
     </button>
+  </div>
+
+  <!-- ==== Trends card (added July 2026) ==== -->
+  <div class="card trends-card">
+    <button type="button" class="trends-toggle" id="trendsToggle" aria-expanded="false" aria-controls="trendsBody">
+      <span class="trends-title">Trends</span>
+      <span class="trends-hint">7-day rolling averages</span>
+      <svg class="chev" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg>
+    </button>
+    <div class="trends-body" id="trendsBody" hidden>
+      <div id="trendsChart"></div>
+      <p class="trends-caption" id="trendsCaption" hidden>
+        Lines are 7-day rolling averages (drawn when at least 4 of 7 days have an entry).
+        Faint dots are daily scores. Shaded bands are Victorian school terms.
+        The dashed line is your average term-time energy.
+      </p>
+    </div>
   </div>
 
   <div class="toast" id="toast"></div>
@@ -795,6 +921,442 @@
       }
     } catch (err) {
       console.error('Tag load failed:', err);
+    }
+  })();
+
+  // =========================================================================
+  // TRENDS (added July 2026)
+  // Rolling 7-day averages of Mood and Energy with Victorian term shading.
+  // Entries are fetched from the Apps Script via GET ?action=entries&pin=...
+  // The PIN lives only in Code.gs (READ_PIN), never in this public file.
+  // =========================================================================
+  (function () {
+    // Victorian government school term dates. Add future years here.
+    const TERMS = [
+      { label: 'Term 1', start: '2026-01-27', end: '2026-04-02' },
+      { label: 'Term 2', start: '2026-04-20', end: '2026-06-26' },
+      { label: 'Term 3', start: '2026-07-13', end: '2026-09-18' },
+      { label: 'Term 4', start: '2026-10-05', end: '2026-12-18' }
+    ];
+
+    const WINDOW = 7;     // rolling window, days
+    const MIN_DAYS = 4;   // scored days needed in the window to draw a point
+    const PIN_KEY = 'ts_read_pin';
+
+    const COLORS = {
+      mood: '#a5813f',
+      energy: '#4a6b41',
+      grid: 'rgba(40, 55, 45, 0.12)',
+      band: 'rgba(40, 55, 45, 0.055)',
+      baseline: 'rgba(40, 55, 45, 0.45)',
+      text: '#4a574e',
+      faint: '#8a978d'
+    };
+
+    const toggle = document.getElementById('trendsToggle');
+    const body = document.getElementById('trendsBody');
+    const box = document.getElementById('trendsChart');
+    const caption = document.getElementById('trendsCaption');
+
+    let isOpen = false;
+    let entriesCache = null;
+    let resizeObs = null;
+
+    toggle.addEventListener('click', () => {
+      isOpen = !isOpen;
+      body.hidden = !isOpen;
+      toggle.setAttribute('aria-expanded', String(isOpen));
+      if (isOpen) {
+        if (entriesCache) renderTrends(entriesCache);
+        else loadEntries();
+      }
+    });
+
+    function showMsg(text) {
+      caption.hidden = true;
+      box.innerHTML = '';
+      const p = document.createElement('p');
+      p.className = 'trends-msg';
+      p.textContent = text;
+      box.appendChild(p);
+    }
+
+    async function loadEntries() {
+      let pin = localStorage.getItem(PIN_KEY);
+      if (!pin) {
+        pin = prompt('Enter your trends PIN');
+        if (!pin || !pin.trim()) {
+          showMsg('A PIN is needed to read your entries. Tap Trends to try again.');
+          return;
+        }
+        pin = pin.trim();
+      }
+
+      showMsg('Reading the stream...');
+
+      try {
+        const url = CONFIG.WEB_APP_URL + '?action=entries&pin=' + encodeURIComponent(pin);
+        const response = await fetch(url, { method: 'GET', redirect: 'follow' });
+        if (!response.ok) throw new Error('HTTP ' + response.status);
+        const data = await response.json();
+
+        if (data && data.success && Array.isArray(data.entries)) {
+          localStorage.setItem(PIN_KEY, pin);
+          entriesCache = data.entries;
+          renderTrends(entriesCache);
+        } else if (data && data.error === 'Wrong PIN') {
+          localStorage.removeItem(PIN_KEY);
+          showMsg('That PIN did not match. Tap Trends to try again.');
+          showToast('Wrong PIN', 'error');
+        } else if (data && data.status) {
+          showMsg('The backend does not have the trends update yet. Paste the new block into Code.gs, save, then Deploy, Manage deployments, pencil icon, New version, Deploy. Then try again.');
+        } else {
+          showMsg('Could not read entries: ' + ((data && data.error) || 'unknown response'));
+        }
+      } catch (err) {
+        showMsg('Could not load trends: ' + err.message);
+      }
+    }
+
+    /* ---------- data shaping ---------- */
+
+    function toNum(v) {
+      if (typeof v === 'number') return v;
+      if (v === null || v === undefined || v === '') return NaN;
+      return Number(String(v).trim());
+    }
+
+    // Scores must be whole numbers 1-5; anything else is treated as a note.
+    function isScore(v) {
+      return Number.isInteger(v) && v >= 1 && v <= 5;
+    }
+
+    function toDayNum(iso) {
+      return Math.round(Date.UTC(+iso.slice(0, 4), +iso.slice(5, 7) - 1, +iso.slice(8, 10)) / 86400000);
+    }
+
+    function dayToDate(n) { return new Date(n * 86400000); }
+
+    function fmtDay(n, o) {
+      return dayToDate(n).toLocaleDateString('en-AU', Object.assign({ timeZone: 'UTC' }, o));
+    }
+
+    function detectFields(entries) {
+      const keys = {};
+      entries.slice(0, 60).forEach(e => {
+        if (e && typeof e === 'object') Object.keys(e).forEach(k => { keys[k] = true; });
+      });
+      const all = Object.keys(keys);
+      const find = test => {
+        for (let i = 0; i < all.length; i++) if (test(all[i].toLowerCase())) return all[i];
+        return null;
+      };
+      return {
+        date: find(k => k === 'date') || find(k => k.indexOf('timestamp') >= 0) || find(k => k.indexOf('date') >= 0),
+        timestamp: find(k => k.indexOf('timestamp') >= 0),
+        mood: find(k => k === 'mood') || find(k => k.indexOf('mood') >= 0),
+        energy: find(k => k === 'energy') || find(k => k.indexOf('energy') >= 0)
+      };
+    }
+
+    function entryDateISO(entry, fields) {
+      const cands = [
+        fields.date ? entry[fields.date] : null,
+        fields.timestamp ? entry[fields.timestamp] : null
+      ];
+      for (let i = 0; i < cands.length; i++) {
+        const v = cands[i];
+        if (v === null || v === undefined || v === '') continue;
+        const s = String(v);
+        if (/^\d{4}-\d{2}-\d{2}/.test(s)) return s.slice(0, 10);
+        const d = new Date(s);
+        if (!isNaN(d)) {
+          const p = x => (String(x).length < 2 ? '0' + x : String(x));
+          return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate());
+        }
+      }
+      return null;
+    }
+
+    // One value per calendar day. Prefers the last entry that has BOTH
+    // scores (the evening wrap); falls back to the last with either.
+    function buildDaily(entries, fields) {
+      const byDay = {};
+      entries.forEach((e, i) => {
+        if (!e || typeof e !== 'object') return;
+        const iso = entryDateISO(e, fields);
+        if (!iso) return;
+        const m = toNum(e[fields.mood]);
+        const en = toNum(e[fields.energy]);
+        const vm = isScore(m) ? m : null;
+        const ve = isScore(en) ? en : null;
+        if (vm === null && ve === null) return;
+        const ts = fields.timestamp ? String(e[fields.timestamp] || '') : '';
+        (byDay[iso] = byDay[iso] || []).push({ mood: vm, energy: ve, ts: ts, i: i });
+      });
+
+      const daily = {};
+      Object.keys(byDay).forEach(iso => {
+        const list = byDay[iso].sort((a, b) => (a.ts < b.ts ? -1 : a.ts > b.ts ? 1 : a.i - b.i));
+        let mood = null, energy = null;
+        const both = list.filter(x => x.mood !== null && x.energy !== null);
+        if (both.length) {
+          const pick = both[both.length - 1];
+          mood = pick.mood;
+          energy = pick.energy;
+        } else {
+          list.forEach(x => {
+            if (x.mood !== null) mood = x.mood;
+            if (x.energy !== null) energy = x.energy;
+          });
+        }
+        daily[toDayNum(iso)] = { mood: mood, energy: energy };
+      });
+      return daily;
+    }
+
+    function rollingSeries(daily, metric, d0, d1) {
+      const out = [];
+      for (let d = d0; d <= d1; d++) {
+        const vals = [];
+        for (let k = d - WINDOW + 1; k <= d; k++) {
+          const row = daily[k];
+          if (row && row[metric] !== null) vals.push(row[metric]);
+        }
+        out.push(vals.length >= MIN_DAYS ? vals.reduce((a, b) => a + b, 0) / vals.length : null);
+      }
+      return out;
+    }
+
+    /* ---------- rendering ---------- */
+
+    function renderTrends(entries) {
+      const fields = detectFields(entries);
+      if (!fields.mood && !fields.energy) {
+        showMsg('No Mood or Energy columns found in the data.');
+        return;
+      }
+
+      const daily = buildDaily(entries, fields);
+      const dayNums = Object.keys(daily).map(Number).sort((a, b) => a - b);
+      if (dayNums.length < 2) {
+        showMsg('Not enough scored days to chart yet. Keep journalling.');
+        return;
+      }
+
+      const d0 = dayNums[0];
+      const d1 = dayNums[dayNums.length - 1];
+      const span = Math.max(1, d1 - d0);
+
+      const rollMood = rollingSeries(daily, 'mood', d0, d1);
+      const rollEnergy = rollingSeries(daily, 'energy', d0, d1);
+
+      const ranges = TERMS.map(t => ({ label: t.label, a: toDayNum(t.start), b: toDayNum(t.end) }));
+      const inTerm = d => ranges.some(r => d >= r.a && d <= r.b);
+
+      const termVals = [];
+      dayNums.forEach(d => {
+        if (daily[d].energy !== null && inTerm(d)) termVals.push(daily[d].energy);
+      });
+      const baseline = termVals.length >= 5
+        ? termVals.reduce((a, b) => a + b, 0) / termVals.length
+        : null;
+
+      const lastNonNull = a => {
+        for (let i = a.length - 1; i >= 0; i--) if (a[i] !== null) return a[i];
+        return null;
+      };
+      const curM = lastNonNull(rollMood);
+      const curE = lastNonNull(rollEnergy);
+
+      // ---- build DOM ----
+      box.innerHTML = '';
+      caption.hidden = false;
+
+      const stats = document.createElement('div');
+      stats.className = 'trends-stats';
+      stats.innerHTML =
+        '<span><span class="trends-dot" style="background:' + COLORS.mood + '"></span>Mood 7-day: <strong>' +
+          (curM === null ? 'n/a' : curM.toFixed(1)) + '</strong></span>' +
+        '<span><span class="trends-dot" style="background:' + COLORS.energy + '"></span>Energy 7-day: <strong>' +
+          (curE === null ? 'n/a' : curE.toFixed(1)) + '</strong></span>' +
+        (baseline !== null
+          ? '<span>term baseline: <strong>' + baseline.toFixed(1) + '</strong></span>'
+          : '');
+      box.appendChild(stats);
+
+      const W = Math.max(260, box.clientWidth || 380);
+      const H = 280;
+      const padL = 26, padR = 12, padT = 22, padB = 24;
+      const plotW = W - padL - padR;
+      const plotH = H - padT - padB;
+      const x = d => padL + ((d - d0) / span) * plotW;
+      const y = v => padT + ((5 - v) / 4) * plotH;
+
+      const parts = [];
+
+      // term bands
+      ranges.forEach(r => {
+        const a = Math.max(r.a, d0);
+        const b = Math.min(r.b, d1);
+        if (a > b) return;
+        parts.push('<rect x="' + x(a).toFixed(1) + '" y="' + padT +
+          '" width="' + (x(b) - x(a)).toFixed(1) + '" height="' + plotH +
+          '" fill="' + COLORS.band + '"/>');
+        parts.push('<text x="' + (x(a) + 5).toFixed(1) + '" y="' + (padT - 8) +
+          '" font-size="10" fill="' + COLORS.faint + '">' + r.label + '</text>');
+      });
+
+      // grid lines and y labels
+      for (let g = 1; g <= 5; g++) {
+        parts.push('<line x1="' + padL + '" y1="' + y(g).toFixed(1) + '" x2="' + (W - padR) +
+          '" y2="' + y(g).toFixed(1) + '" stroke="' + COLORS.grid + '" stroke-width="1"/>');
+        parts.push('<text x="' + (padL - 7) + '" y="' + (y(g) + 3.5).toFixed(1) +
+          '" font-size="10" text-anchor="end" fill="' + COLORS.faint + '">' + g + '</text>');
+      }
+
+      // x ticks: Mondays for short spans, month starts beyond ~14 weeks
+      let ticks = [];
+      if (span <= 98) {
+        for (let d = d0; d <= d1; d++) if (dayToDate(d).getUTCDay() === 1) ticks.push(d);
+        if (!ticks.length) ticks = [d0, d1];
+      } else {
+        for (let d = d0; d <= d1; d++) if (dayToDate(d).getUTCDate() === 1) ticks.push(d);
+      }
+      if (ticks.length > 1 && plotW / ticks.length < 46) {
+        ticks = ticks.filter((_, i) => i % 2 === 0);
+      }
+      ticks.forEach(t => {
+        const lbl = span <= 98
+          ? fmtDay(t, { day: 'numeric', month: 'short' })
+          : fmtDay(t, { month: 'short' });
+        parts.push('<line x1="' + x(t).toFixed(1) + '" y1="' + (padT + plotH) + '" x2="' + x(t).toFixed(1) +
+          '" y2="' + (padT + plotH + 4) + '" stroke="' + COLORS.grid + '"/>');
+        parts.push('<text x="' + x(t).toFixed(1) + '" y="' + (H - 8) +
+          '" font-size="10" text-anchor="middle" fill="' + COLORS.faint + '">' + lbl + '</text>');
+      });
+
+      // term baseline (mean term-time energy)
+      if (baseline !== null) {
+        parts.push('<line x1="' + padL + '" y1="' + y(baseline).toFixed(1) + '" x2="' + (W - padR) +
+          '" y2="' + y(baseline).toFixed(1) + '" stroke="' + COLORS.baseline +
+          '" stroke-width="1" stroke-dasharray="4 4"/>');
+      }
+
+      // raw daily points
+      dayNums.forEach(d => {
+        const row = daily[d];
+        if (row.mood !== null) {
+          parts.push('<circle cx="' + x(d).toFixed(1) + '" cy="' + y(row.mood).toFixed(1) +
+            '" r="2" fill="' + COLORS.mood + '" opacity="0.35"/>');
+        }
+        if (row.energy !== null) {
+          parts.push('<circle cx="' + x(d).toFixed(1) + '" cy="' + y(row.energy).toFixed(1) +
+            '" r="2" fill="' + COLORS.energy + '" opacity="0.35"/>');
+        }
+      });
+
+      // rolling lines with gaps where data is sparse
+      const linePath = series => {
+        let p = '';
+        let pen = false;
+        for (let i = 0; i < series.length; i++) {
+          const v = series[i];
+          if (v === null) { pen = false; continue; }
+          p += (pen ? 'L' : 'M') + x(d0 + i).toFixed(1) + ' ' + y(v).toFixed(1);
+          pen = true;
+        }
+        return p;
+      };
+      parts.push('<path d="' + linePath(rollMood) + '" fill="none" stroke="' + COLORS.mood +
+        '" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>');
+      parts.push('<path d="' + linePath(rollEnergy) + '" fill="none" stroke="' + COLORS.energy +
+        '" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>');
+
+      const svgNS = 'http://www.w3.org/2000/svg';
+      const svg = document.createElementNS(svgNS, 'svg');
+      svg.setAttribute('width', W);
+      svg.setAttribute('height', H);
+      svg.setAttribute('viewBox', '0 0 ' + W + ' ' + H);
+      svg.setAttribute('role', 'img');
+      svg.setAttribute('aria-label', 'Seven day rolling averages. Mood ' +
+        (curM === null ? 'unavailable' : curM.toFixed(1)) + ', energy ' +
+        (curE === null ? 'unavailable' : curE.toFixed(1)) +
+        (baseline !== null ? ', term baseline ' + baseline.toFixed(1) : '') + '.');
+      svg.innerHTML = parts.join('');
+      box.appendChild(svg);
+
+      // hover and tap guide with tooltip
+      const guide = document.createElementNS(svgNS, 'line');
+      guide.setAttribute('y1', padT);
+      guide.setAttribute('y2', padT + plotH);
+      guide.setAttribute('stroke', COLORS.grid);
+      guide.setAttribute('stroke-width', '1');
+      guide.style.display = 'none';
+      svg.appendChild(guide);
+
+      const tip = document.createElement('div');
+      tip.className = 'trends-tip';
+      box.appendChild(tip);
+
+      const nearestDayWithData = d => {
+        for (let off = 0; off <= 3; off++) {
+          const a = d - off, b = d + off;
+          if (daily[a] || rollMood[a - d0] != null || rollEnergy[a - d0] != null) return a;
+          if (daily[b] || rollMood[b - d0] != null || rollEnergy[b - d0] != null) return b;
+        }
+        return null;
+      };
+
+      svg.addEventListener('pointermove', ev => {
+        const rect = svg.getBoundingClientRect();
+        const px = ev.clientX - rect.left;
+        let d = Math.round(d0 + ((px - padL) / plotW) * span);
+        if (d < d0) d = d0;
+        if (d > d1) d = d1;
+        d = nearestDayWithData(d);
+        if (d === null) { guide.style.display = 'none'; tip.style.display = 'none'; return; }
+
+        const X = x(d);
+        guide.setAttribute('x1', X);
+        guide.setAttribute('x2', X);
+        guide.style.display = '';
+
+        const row = daily[d] || {};
+        const rm = rollMood[d - d0];
+        const re = rollEnergy[d - d0];
+        const fmtVal = (raw, roll) => {
+          const bits = [];
+          if (raw !== null && raw !== undefined) bits.push(String(raw));
+          if (roll !== null && roll !== undefined) bits.push('7-day ' + roll.toFixed(1));
+          return bits.length ? bits.join(', ') : 'no entry';
+        };
+        tip.innerHTML = '<strong>' + fmtDay(d, { weekday: 'short', day: 'numeric', month: 'short' }) + '</strong><br>' +
+          'Mood: ' + fmtVal(row.mood, rm) + '<br>' +
+          'Energy: ' + fmtVal(row.energy, re);
+        tip.style.left = (X) + 'px';
+        tip.style.top = (svg.offsetTop + padT) + 'px';
+        tip.style.display = 'block';
+      });
+
+      svg.addEventListener('pointerleave', () => {
+        guide.style.display = 'none';
+        tip.style.display = 'none';
+      });
+
+      // redraw when the card width changes (e.g. phone rotation)
+      if (!resizeObs && typeof ResizeObserver !== 'undefined') {
+        let timer = null;
+        let lastW = box.clientWidth;
+        resizeObs = new ResizeObserver(() => {
+          if (!entriesCache || !isOpen) return;
+          if (box.clientWidth === lastW) return;
+          lastW = box.clientWidth;
+          clearTimeout(timer);
+          timer = setTimeout(() => renderTrends(entriesCache), 150);
+        });
+        resizeObs.observe(box);
+      }
     }
   })();
 </script>
